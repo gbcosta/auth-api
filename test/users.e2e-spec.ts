@@ -26,7 +26,6 @@ describe('Users (e2e)', () => {
     );
 
     await app.init();
-    await prisma.user.deleteMany();
   });
 
   afterAll(async () => {
@@ -53,6 +52,67 @@ describe('Users (e2e)', () => {
       );
 
       expect(response.body.password).toBeUndefined();
+    });
+
+    it('should reject invalid email', async () => {
+      await request(app.getHttpServer())
+        .post('/users')
+        .send({
+          name: 'Gabriel',
+          email: 'invalid-email',
+          password: '12345678',
+        })
+        .expect(400);
+    });
+
+    it('should reject short password', async () => {
+      await request(app.getHttpServer())
+        .post('/users')
+        .send({
+          name: 'Gabriel',
+          email: 'invalid-email',
+          password: '1',
+        })
+        .expect(400);
+    });
+
+    it('should reject a short name', async () => {
+      await request(app.getHttpServer())
+        .post('/users')
+        .send({
+          name: 'G',
+          email: 'another2@example.com',
+          password: '12345678',
+        })
+        .expect(400);
+    });
+
+    it('should reject unknown fields', async () => {
+      await request(app.getHttpServer())
+        .post('/users')
+        .send({
+          name: 'Gabriel',
+          email: 'another3@example.com',
+          password: '12345678',
+          isAdmin: true,
+        })
+        .expect(400);
+    });
+    it('should reject a duplicated email', async () => {
+      const user = {
+        name: 'Gabriel',
+        email: 'duplicate@example.com',
+        password: '12345678',
+      };
+
+      await request(app.getHttpServer()).post('/users').send(user).expect(201);
+
+      const response = await request(app.getHttpServer())
+        .post('/users')
+        .send(user)
+        .expect(409);
+
+      expect(response.body.message).toBe('Email already in use');
     });
   });
 });
