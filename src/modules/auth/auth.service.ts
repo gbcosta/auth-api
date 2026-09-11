@@ -64,4 +64,44 @@ export class AuthService {
       refreshToken,
     };
   }
+
+  async refresh(refreshToken: string) {
+    const payload = await this.jwtService.verifyAsync<{
+      sub: string;
+    }>(refreshToken, {
+      secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+    });
+
+    const refreshTokens = await this.prisma.refreshToken.findMany({
+      where: {
+        userId: payload.sub,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    let validToken: (typeof refreshTokens)[number] | null = null;
+
+    for (const storedToken of refreshTokens) {
+      const matches = await bcrypt.compare(refreshToken, storedToken.tokenHash);
+
+      if (matches) {
+        validToken = storedToken;
+      }
+    }
+
+    if (!validToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const accessToken = await this.jwtService.signAsync({
+      sub: payload.sub,
+      email: validToken.user.email,
+    });
+
+    return {
+      accessToken,
+    };
+  }
 }
