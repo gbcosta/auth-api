@@ -49,6 +49,16 @@ export class AuthService {
       },
     );
 
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        tokenHash: refreshTokenHash,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
     return {
       accessToken,
       refreshToken,
