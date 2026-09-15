@@ -66,11 +66,15 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
-    const payload = await this.jwtService.verifyAsync<{
-      sub: string;
-    }>(refreshToken, {
-      secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
-    });
+    const payload = await this.jwtService
+      .verifyAsync<{
+        sub: string;
+      }>(refreshToken, {
+        secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+      })
+      .catch((_) => {
+        throw new UnauthorizedException('Invalid refresh token');
+      });
 
     const refreshTokens = await this.prisma.refreshToken.findMany({
       where: {
@@ -82,7 +86,6 @@ export class AuthService {
     });
 
     let validToken: (typeof refreshTokens)[number] | null = null;
-
     for (const storedToken of refreshTokens) {
       const matches = await bcrypt.compare(refreshToken, storedToken.tokenHash);
 

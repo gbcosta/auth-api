@@ -5,6 +5,8 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
+import { JwtService } from '@nestjs/jwt';
+
 describe('Auth (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -33,11 +35,12 @@ describe('Auth (e2e)', () => {
 
     await app.init();
 
+    await prisma.user.deleteMany();
     await request(app.getHttpServer()).post('/users').send(user).expect(201);
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany();
+    //await prisma.user.deleteMany();
     await app.close();
   });
 
@@ -105,6 +108,57 @@ describe('Auth (e2e)', () => {
       await request(app.getHttpServer())
         .get('/users/me')
         .set('Authorization', 'Bearer invalid-token')
+        .expect(401);
+    });
+  });
+
+  describe('POST auth/refresh', () => {
+    it('should refresh the acces token', async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: user.email,
+          password: user.password,
+        })
+        .expect(201);
+
+      const refreshToken = loginResponse.body.refreshToken;
+      const response = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({
+          refreshToken,
+        })
+        .expect(201);
+
+      expect(response.body.accessToken).toBeDefined();
+      expect(typeof response.body.accessToken).toBe('string');
+    });
+
+    it('should reject an invalid refresh token', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({
+          refreshToken: 'invalid-refresh-token',
+        })
+        .expect(401);
+    });
+
+    it('Should reject an exprired refreshed token', async () => {
+      const jwtService = app.get(JwtService);
+      const expiredRefreshedToken = await jwtService.signAsync(
+        {
+          sub: 'some-user',
+        },
+        {
+          secret: process.env.JWT_REFRESH_SECRET,
+          expiresIn: '-1s',
+        },
+      );
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({
+          refreshToken: expiredRefreshedToken,
+        })
         .expect(401);
     });
   });
