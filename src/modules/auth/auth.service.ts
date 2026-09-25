@@ -41,12 +41,12 @@ export class AuthService {
 
     const accessToken = await this.jwtService.signAsync({
       ...payload,
-      jti: randomUUID(),
     });
+
     const refreshToken = await this.jwtService.signAsync(
       {
-        sub: user.id,
         jti: randomUUID(),
+        sub: user.id,
       },
       {
         secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
@@ -73,8 +73,8 @@ export class AuthService {
   async refresh(refreshToken: string) {
     const payload = await this.jwtService
       .verifyAsync<{
-        sub: string;
         jti: UUID;
+        sub: string;
       }>(refreshToken, {
         secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
       })
@@ -90,28 +90,12 @@ export class AuthService {
         user: true,
       },
     });
-    console.log('Tokens no banco:', refreshTokens.length);
-    console.log('Token recebido:', refreshToken);
 
     let validToken: (typeof refreshTokens)[number] | null = null;
     for (const storedToken of refreshTokens) {
       const matches = await bcrypt.compare(refreshToken, storedToken.tokenHash);
-      console.log('Token encontrado:', storedToken.id);
-      console.log('Match:', matches);
 
       if (matches) {
-        const jtiRefreshTokenRecebido = this.jwtService.decode<{
-          sub: string;
-          jti: UUID;
-        }>(refreshToken);
-
-        const storedTokenJti = this.jwtService.decode<{
-          sub: string;
-          jti: UUID;
-        }>(refreshToken);
-
-        console.log({ refreshToken, storedToken });
-        console.log({ jtiRefreshTokenRecebido, storedTokenJti });
         validToken = storedToken;
         break;
       }
@@ -126,23 +110,22 @@ export class AuthService {
         id: validToken.id,
       },
     });
-    const deleted = await this.prisma.refreshToken.findUnique({
+
+    await this.prisma.refreshToken.findUnique({
       where: {
         id: validToken.id,
       },
     });
-    console.log({ deleted });
 
     const accessToken = await this.jwtService.signAsync({
       sub: payload.sub,
-      jti: randomUUID(),
       email: validToken.user.email,
     });
 
     const newRefreshToken = await this.jwtService.signAsync(
       {
-        sub: payload.sub,
         jti: randomUUID(),
+        sub: payload.sub,
       },
       {
         secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),

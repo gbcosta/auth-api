@@ -185,9 +185,6 @@ describe('Auth (e2e)', () => {
       expect(refreshTokenB).toBeDefined();
       expect(refreshTokenB).not.toBe(refreshTokenA);
 
-      console.log('A:', refreshTokenA);
-      console.log('B:', refreshTokenB);
-
       await request(app.getHttpServer())
         .post('/auth/refresh')
         .send({
