@@ -40,7 +40,6 @@ describe('Auth (e2e)', () => {
   });
 
   afterAll(async () => {
-    //await prisma.user.deleteMany();
     await app.close();
   });
 
@@ -154,12 +153,54 @@ describe('Auth (e2e)', () => {
           expiresIn: '-1s',
         },
       );
+
       await request(app.getHttpServer())
         .post('/auth/refresh')
         .send({
           refreshToken: expiredRefreshedToken,
         })
         .expect(401);
+    });
+
+    it('Should rotate the refresh token', async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: user.email,
+          password: user.password,
+        })
+        .expect(201);
+
+      const refreshTokenA = loginResponse.body.refreshToken;
+
+      const refreshResponse = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({
+          refreshToken: refreshTokenA,
+        })
+        .expect(201);
+
+      const refreshTokenB = refreshResponse.body.refreshToken;
+
+      expect(refreshTokenB).toBeDefined();
+      expect(refreshTokenB).not.toBe(refreshTokenA);
+
+      console.log('A:', refreshTokenA);
+      console.log('B:', refreshTokenB);
+
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({
+          refreshToken: refreshTokenA,
+        })
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({
+          refreshToken: refreshTokenB,
+        })
+        .expect(201);
     });
   });
 });

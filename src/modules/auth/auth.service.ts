@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID, UUID } from 'node:crypto';
 
 @Injectable()
 export class AuthService {
@@ -38,10 +39,14 @@ export class AuthService {
       email: user.email,
     };
 
-    const accessToken = await this.jwtService.signAsync(payload);
+    const accessToken = await this.jwtService.signAsync({
+      ...payload,
+      jti: randomUUID(),
+    });
     const refreshToken = await this.jwtService.signAsync(
       {
         sub: user.id,
+        jti: randomUUID(),
       },
       {
         secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
@@ -69,6 +74,7 @@ export class AuthService {
     const payload = await this.jwtService
       .verifyAsync<{
         sub: string;
+        jti: UUID;
       }>(refreshToken, {
         secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
       })
@@ -84,13 +90,30 @@ export class AuthService {
         user: true,
       },
     });
+    console.log('Tokens no banco:', refreshTokens.length);
+    console.log('Token recebido:', refreshToken);
 
     let validToken: (typeof refreshTokens)[number] | null = null;
     for (const storedToken of refreshTokens) {
       const matches = await bcrypt.compare(refreshToken, storedToken.tokenHash);
+      console.log('Token encontrado:', storedToken.id);
+      console.log('Match:', matches);
 
       if (matches) {
+        const jtiRefreshTokenRecebido = this.jwtService.decode<{
+          sub: string;
+          jti: UUID;
+        }>(refreshToken);
+
+        const storedTokenJti = this.jwtService.decode<{
+          sub: string;
+          jti: UUID;
+        }>(refreshToken);
+
+        console.log({ refreshToken, storedToken });
+        console.log({ jtiRefreshTokenRecebido, storedTokenJti });
         validToken = storedToken;
+        break;
       }
     }
 
@@ -98,13 +121,48 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
+    await this.prisma.refreshToken.delete({
+      where: {
+        id: validToken.id,
+      },
+    });
+    const deleted = await this.prisma.refreshToken.findUnique({
+      where: {
+        id: validToken.id,
+      },
+    });
+    console.log({ deleted });
+
     const accessToken = await this.jwtService.signAsync({
       sub: payload.sub,
+      jti: randomUUID(),
       email: validToken.user.email,
+    });
+
+    const newRefreshToken = await this.jwtService.signAsync(
+      {
+        sub: payload.sub,
+        jti: randomUUID(),
+      },
+      {
+        secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+        expiresIn: '7d',
+      },
+    );
+
+    const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        tokenHash: newRefreshTokenHash,
+        userId: payload.sub,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
     });
 
     return {
       accessToken,
+      refreshToken: newRefreshToken,
     };
   }
 }
