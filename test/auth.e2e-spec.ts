@@ -142,6 +142,32 @@ describe('Auth (e2e)', () => {
         .expect(401);
     });
 
+    it('should reject an empty refresh token', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({
+          refreshToken: '',
+        })
+        .expect(400);
+    });
+
+    it('should reject a missing refresh token', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({})
+        .expect(400);
+    });
+
+    it('should reject unknown fields', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({
+          refreshToken: 'some-token',
+          unknownField: 'something',
+        })
+        .expect(400);
+    });
+
     it('Should reject an exprired refreshed token', async () => {
       const jwtService = app.get(JwtService);
       const expiredRefreshedToken = await jwtService.signAsync(
