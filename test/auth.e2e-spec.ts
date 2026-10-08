@@ -75,6 +75,28 @@ describe('Auth (e2e)', () => {
         })
         .expect(401);
     });
+
+    it('should return the same error for an unknown user and an incorrect password', async () => {
+      const unknownUserResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: 'unknown@example.com',
+          password: '12345678',
+        })
+        .expect(401);
+
+      const wrongPasswordResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: user.email,
+          password: 'wrong-password',
+        })
+        .expect(401);
+
+      expect(unknownUserResponse.body.message).toEqual(
+        wrongPasswordResponse.body.message,
+      );
+    });
   });
 
   describe('GET /users/me', () => {
