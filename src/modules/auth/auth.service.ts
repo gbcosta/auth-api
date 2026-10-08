@@ -105,18 +105,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    await this.prisma.refreshToken.delete({
-      where: {
-        id: validToken.id,
-      },
-    });
-
-    await this.prisma.refreshToken.findUnique({
-      where: {
-        id: validToken.id,
-      },
-    });
-
     const accessToken = await this.jwtService.signAsync({
       sub: payload.sub,
       email: validToken.user.email,
@@ -135,12 +123,20 @@ export class AuthService {
 
     const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
 
-    await this.prisma.refreshToken.create({
-      data: {
-        tokenHash: newRefreshTokenHash,
-        userId: payload.sub,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.refreshToken.delete({
+        where: {
+          id: validToken.id,
+        },
+      });
+
+      await tx.refreshToken.create({
+        data: {
+          tokenHash: newRefreshTokenHash,
+          userId: payload.sub,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      });
     });
 
     return {
