@@ -99,7 +99,7 @@ export class AuthService {
     for (const storedToken of refreshTokens) {
       const matches = hashRefreshToken(refreshToken) == storedToken.tokenHash;
 
-      if (matches) {
+      if (matches && storedToken.expiresAt > new Date()) {
         validToken = storedToken;
         break;
       }
