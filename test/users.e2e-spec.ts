@@ -8,6 +8,15 @@ import { PrismaService } from '../src/prisma/prisma.service';
 describe('Users (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  const deleteUsers = async () => {
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          in: ['duplicate@example.com', 'test@example.com'],
+        },
+      },
+    });
+  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -26,10 +35,11 @@ describe('Users (e2e)', () => {
     );
 
     await app.init();
+    await deleteUsers();
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany();
+    await deleteUsers();
     await app.close();
   });
 

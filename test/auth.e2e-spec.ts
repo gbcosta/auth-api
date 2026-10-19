@@ -17,6 +17,16 @@ describe('Auth (e2e)', () => {
     password: '12345678',
   };
 
+  const deleteUsers = async () => {
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          in: [user.email],
+        },
+      },
+    });
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -34,12 +44,13 @@ describe('Auth (e2e)', () => {
     );
 
     await app.init();
+    await deleteUsers();
 
-    await prisma.user.deleteMany();
     await request(app.getHttpServer()).post('/users').send(user).expect(201);
   });
 
   afterAll(async () => {
+    await deleteUsers();
     await app.close();
   });
 
