@@ -124,11 +124,14 @@ export class AuthService {
     const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.refreshToken.delete({
+      const deleted = await tx.refreshToken.deleteMany({
         where: {
           id: validToken.id,
         },
       });
+      if (deleted.count == 0) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
 
       await tx.refreshToken.create({
         data: {
