@@ -274,5 +274,30 @@ describe('Auth (e2e)', () => {
       expect(statuses.filter((status) => status === 201)).toHaveLength(1);
       expect(statuses.filter((status) => status === 401)).toHaveLength(1);
     });
+
+    it('Should reject an exprired refreshed token in database', async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: user.email,
+          password: user.password,
+        })
+        .expect(201);
+
+      const refreshToken = loginResponse.body.refreshToken;
+      jest.useFakeTimers({
+        advanceTimers: true,
+        now: Date.now() + 14 * 24 * 60 * 60 * 1000,
+      });
+
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({
+          refreshToken: refreshToken,
+        })
+        .expect(401);
+
+      jest.useRealTimers();
+    });
   });
 });
