@@ -247,5 +247,32 @@ describe('Auth (e2e)', () => {
         })
         .expect(201);
     });
+
+    it('should allow only one concurrent refresh using the same token', async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: user.email,
+          password: user.password,
+        })
+        .expect(201);
+
+      const refreshToken = loginResponse.body.refreshToken;
+
+      const responses = await Promise.all([
+        request(app.getHttpServer())
+          .post('/auth/refresh')
+          .send({ refreshToken }),
+
+        request(app.getHttpServer())
+          .post('/auth/refresh')
+          .send({ refreshToken }),
+      ]);
+
+      const statuses = responses.map((response) => response.status);
+
+      expect(statuses.filter((status) => status === 201)).toHaveLength(1);
+      expect(statuses.filter((status) => status === 401)).toHaveLength(1);
+    });
   });
 });
