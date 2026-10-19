@@ -4,7 +4,11 @@ import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID, UUID } from 'node:crypto';
+import { randomUUID, UUID, createHash } from 'node:crypto';
+
+function hashRefreshToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 @Injectable()
 export class AuthService {
@@ -54,7 +58,7 @@ export class AuthService {
       },
     );
 
-    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    const refreshTokenHash = hashRefreshToken(refreshToken);
 
     await this.prisma.refreshToken.create({
       data: {
@@ -93,7 +97,7 @@ export class AuthService {
 
     let validToken: (typeof refreshTokens)[number] | null = null;
     for (const storedToken of refreshTokens) {
-      const matches = await bcrypt.compare(refreshToken, storedToken.tokenHash);
+      const matches = hashRefreshToken(refreshToken) == storedToken.tokenHash;
 
       if (matches) {
         validToken = storedToken;
@@ -121,7 +125,7 @@ export class AuthService {
       },
     );
 
-    const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
+    const newRefreshTokenHash = hashRefreshToken(newRefreshToken);
 
     await this.prisma.$transaction(async (tx) => {
       const deleted = await tx.refreshToken.deleteMany({
