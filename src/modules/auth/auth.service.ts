@@ -96,10 +96,12 @@ export class AuthService {
     });
 
     let validToken: (typeof refreshTokens)[number] | null = null;
+    const now = new Date();
+
     for (const storedToken of refreshTokens) {
       const matches = hashRefreshToken(refreshToken) === storedToken.tokenHash;
 
-      if (matches && storedToken.expiresAt > new Date()) {
+      if (matches && storedToken.expiresAt > now) {
         validToken = storedToken;
         break;
       }
